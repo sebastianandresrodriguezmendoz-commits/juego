@@ -1,0 +1,57 @@
+services:
+  # 1. Base de datos MySQL 8.0 Oficial
+  db:
+    image: mysql:8.0
+    container_name: gunrun_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: gunrun_root_password_2026
+      MYSQL_DATABASE: gunrun2d
+      MYSQL_USER: gunrun_user
+      MYSQL_PASSWORD: gunrun_secure_password_2026
+    ports:
+      - "3306:3306"
+    volumes:
+      - gunrun_mysql_data:/var/lib/mysql
+      - ./backend/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pgunrun_root_password_2026"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - gunrun_net
+
+  # 2. Servidor de Producción GunRun 2D (Waitress WSGI + API Flask + Frontend)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gunrun_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: gunrun_user
+      DB_PASSWORD: gunrun_secure_password_2026
+      DB_NAME: gunrun2d
+      SECRET_KEY: gunrun2d_super_secret_jwt_key_prod_2026
+      FLASK_ENV: production
+      PORT: 5000
+    ports:
+      - "5000:5000"
+    networks:
+      - gunrun_net
+
+volumes:
+  gunrun_mysql_data:
+    driver: local
+
+networks:
+  gunrun_net:
+    driver: bridge
+

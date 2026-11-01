@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GunRun 2D - Combate Arcade, Arsenal Táctico y Boss Battles</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Custom Retro Arcade Neon Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Contenedor Dinámico de Toasts Retro Neón -->
+    <div id="toast-container"></div>
+
+    <!-- Header / Navbar Principal -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-transparent border-bottom border-secondary border-opacity-25 py-3">
+        <div class="container">
+            <a class="navbar-brand brand-font d-flex align-items-center gap-2" href="#">
+                <span class="fs-3 fw-bold neon-title">GUNRUN <span style="color: var(--neon-pink);">2D</span></span>
+                <span class="badge bg-dark border border-success text-success ms-2">SISTEMA EXPANDIDO &bull; MYSQL</span>
+            </a>
+
+            <div class="d-flex align-items-center gap-2">
+                <button id="btn-instructions" class="btn btn-sm btn-outline-warning brand-font d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#instructionsModal" title="Instrucciones y Lore del Juego">
+                    <i class="bi bi-journal-text text-warning"></i> <span>¿CÓMO JUGAR?</span>
+                </button>
+                <div class="status-pill">
+                    <span id="status-dot" class="status-dot"></span>
+                    <span id="status-text" class="text-light">Conectando...</span>
+                </div>
+                <button id="btn-check-health" class="btn btn-sm btn-outline-info" title="Comprobar Estado del Servidor">
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <main class="container my-4">
+        <!-- Notificaciones de Alerta -->
+        <div id="alert-box" class="alert d-none" role="alert">
+            <div class="d-flex justify-content-between align-items-center">
+                <span id="alert-message">Mensaje</span>
+                <button type="button" class="btn-close btn-close-white" onclick="document.getElementById('alert-box').classList.add('d-none')"></button>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 1: ARENA DE JUEGO CANVAS 2D -->
+        <section class="arcade-panel p-3 p-md-4 mb-4">
+            <!-- Barra Superior del HUD del Motor -->
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="brand-font fs-5 text-white"><i class="bi bi-crosshair text-danger me-2"></i> ARENA DE COMBATE</span>
+                    <span class="badge bg-dark border border-info text-info px-2 py-1 brand-font" id="hud-game-status">LISTO</span>
+                    <span class="badge bg-black border border-secondary text-success px-2 py-1 brand-font" id="hud-fps">60 FPS</span>
+                </div>
+
+                <!-- Selector Rápido de Armas Tácticas -->
+                <div class="d-flex align-items-center gap-1 flex-wrap" id="weapon-selector-hud">
+                    <button class="btn btn-sm btn-weapon active" data-weapon="blaster" id="btn-weapon-1" title="Blaster de Plasma [Tecla 1]">
+                        <span class="key-badge">1</span> Blaster
+                    </button>
+                    <button class="btn btn-sm btn-weapon" data-weapon="shotgun" id="btn-weapon-2" title="Escopeta de Dispersión [Tecla 2]">
+                        <span class="key-badge">2</span> Escopeta
+                    </button>
+                    <button class="btn btn-sm btn-weapon" data-weapon="railgun" id="btn-weapon-3" title="Railgun Penetrante [Tecla 3]">
+                        <span class="key-badge">3</span> Railgun
+                    </button>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#instructionsModal" title="Manual de Combate y Lore">
+                        <i class="bi bi-journal-bookmark-fill me-1"></i> Guía
+                    </button>
+                    <button id="btn-game-start" class="btn btn-sm btn-neon-cyan">
+                        <i class="bi bi-play-fill me-1"></i> Iniciar Combate
+                    </button>
+                    <button id="btn-game-pause" class="btn btn-sm btn-outline-warning">
+                        <i class="bi bi-pause-fill me-1"></i> Pausa [ESC]
+                    </button>
+                    <button id="btn-toggle-sound" class="btn btn-sm btn-outline-warning" title="Silenciar / Activar Efectos de Sonido">
+                        <i class="bi bi-volume-up-fill" id="sound-icon"></i>
+                    </button>
+                    <button id="btn-game-center" class="btn btn-sm btn-outline-info" title="Fijar y Centrar Pantalla">
+                        <i class="bi bi-arrows-collapse me-1"></i> Centrar
+                    </button>
+                    <button id="btn-game-fullscreen" class="btn btn-sm btn-outline-light" title="Pantalla Completa">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                    </button>
+                    <button id="btn-game-reset-pos" class="btn btn-sm btn-outline-danger" title="Reiniciar Partida">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Viewport del Canvas -->
+            <div class="game-viewport">
+                <canvas id="gameCanvas" width="1000" height="600"></canvas>
+            </div>
+
+            <!-- Barra Inferior de Controles del Motor -->
+            <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-3 text-secondary small">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span><span class="key-badge">W</span> <span class="key-badge">A</span> <span class="key-badge">S</span> <span class="key-badge">D</span> Mover</span>
+                    <span><span class="key-badge"><i class="bi bi-mouse"></i> Clic</span> Disparar</span>
+                    <span><span class="key-badge">R</span> Recargar</span>
+                    <span><span class="key-badge">1</span> <span class="key-badge">2</span> <span class="key-badge">3</span> Arsenal</span>
+                    <span><span class="key-badge">ESC</span> Pausa</span>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="text-muted small">Drops en Arena:</span>
+                    <span class="powerup-pill powerup-health"><i class="bi bi-heart-fill"></i> +35 HP</span>
+                    <span class="powerup-pill powerup-ammo"><i class="bi bi-lightning-fill"></i> +60 Balas</span>
+                    <span class="powerup-pill powerup-shield"><i class="bi bi-shield-fill"></i> Escudo</span>
+                    <span class="powerup-pill powerup-rapid"><i class="bi bi-fire"></i> Frenesí</span>
+                    <span class="powerup-pill powerup-nuke"><i class="bi bi-radioactive"></i> PEM Nuke</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 2: GESTIÓN DE JUGADOR, ESTADÍSTICAS Y AUTENTICACIÓN -->
+        <div class="row g-4 align-items-stretch mb-5">
+            <!-- Columna Izquierda: Arquitectura e Información del Arsenal -->
+            <div class="col-lg-5">
+                <div class="arcade-panel p-4 h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <span class="neon-subtitle">Arsenal Táctico y Combate</span>
+                        <h2 class="brand-font fs-3 mt-1 mb-3 text-white">Sistemas y Balística Avanzada</h2>
+                        <p class="text-secondary small">
+                            Motor físico de disparos con 3 configuraciones de armas intercambiables en tiempo real, balística enemiga con proyectiles esquivables y enfrentamientos contra el <strong>Mega Titán Omega</strong> cada 5 oleadas.
+                        </p>
+
+                        <hr class="border-secondary border-opacity-25 my-3">
+
+                        <h6 class="brand-font text-info mb-2"><i class="bi bi-shield-shaded me-1"></i> Mecánicas de Combate Activas:</h6>
+                        <ul class="list-unstyled small text-light ps-1">
+                            <li class="mb-2"><i class="bi bi-bullseye text-info me-2"></i> <strong>Arsenal [1, 2, 3]:</strong> Blaster rápido, Escopeta en abanico y Railgun perforante.</li>
+                            <li class="mb-2"><i class="bi bi-shield-plus text-primary me-2"></i> <strong>Power-Ups en Arena:</strong> Botiquines, Recargas, Sobreescudo y Bomba Nuke.</li>
+                            <li class="mb-2"><i class="bi bi-radioactive text-danger me-2"></i> <strong>Balística Enemiga:</strong> Drones francotiradores que disparan y drones kamikaze.</li>
+                            <li class="mb-2"><i class="bi bi-robot text-warning me-2"></i> <strong>Boss Titan Goliath:</strong> Combate épico cada 5 oleadas con barra de salud dedicada.</li>
+                            <li class="mb-2"><i class="bi bi-phone-vibrate text-pink me-2"></i> <strong>Screen Shake:</strong> Impacto cinemático 2D y textos de daño flotante en vivo.</li>
+                            <li class="mb-2"><i class="bi bi-cloud-check text-success me-2"></i> <strong>Sincronización MySQL:</strong> Auto-guardado y consulta del historial de partidas.</li>
+                        </ul>
+                    </div>
+
+                    <div class="p-3 rounded bg-black bg-opacity-50 border border-secondary border-opacity-25 mt-4">
+                        <small class="text-info d-block brand-font"><i class="bi bi-check2-circle me-1"></i> Estado del Proyecto:</small>
+                        <span class="text-light small">Backend Flask + MySQL, Autenticación JWT, Leaderboard Top 10 Global y guardado continuo de récords.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Dashboard del Jugador / Formularios de Acceso -->
+            <div class="col-lg-7">
+                <!-- Panel 1: Formularios (si no hay sesión) -->
+                <div id="auth-forms-container" class="arcade-panel p-4">
+                    <ul class="nav nav-pills nav-fill mb-4 p-1 bg-black bg-opacity-40 rounded" id="authTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="login-tab" data-bs-toggle="pill" data-bs-target="#login-pane" type="button" role="tab">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Iniciar Sesión
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="register-tab" data-bs-toggle="pill" data-bs-target="#register-pane" type="button" role="tab">
+                                <i class="bi bi-person-plus me-1"></i> Registrar Jugador
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="authTabsContent">
+                        <!-- Pestaña Login -->
+                        <div class="tab-pane fade show active" id="login-pane" role="tabpanel">
+                            <form id="login-form">
+                                <div class="mb-3">
+                                    <label for="login-identifier" class="form-label small text-info">Usuario o Correo Electrónico</label>
+                                    <input type="text" class="form-control form-control-neon" id="login-identifier" placeholder="ej. sebas_pro o test@gunrun.com" required>
+                                </div>
+                                <div class="mb-4">
+                                    <label for="login-password" class="form-label small text-info">Contraseña</label>
+                                    <input type="password" class="form-control form-control-neon" id="login-password" placeholder="Tu clave de acceso" required>
+                                </div>
+                                <button type="submit" class="btn btn-neon-cyan w-100 py-2">
+                                    <i class="bi bi-door-open me-2"></i> Acceder a GunRun 2D
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Pestaña Registro -->
+                        <div class="tab-pane fade" id="register-pane" role="tabpanel">
+                            <form id="register-form">
+                                <div class="mb-3">
+                                    <label for="reg-username" class="form-label small text-info">Nombre de Jugador (Username)</label>
+                                    <input type="text" class="form-control form-control-neon" id="reg-username" placeholder="Mínimo 3 caracteres alfanuméricos" required minlength="3">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="reg-email" class="form-label small text-info">Correo Electrónico</label>
+                                    <input type="email" class="form-control form-control-neon" id="reg-email" placeholder="correo@dominio.com" required>
+                                </div>
+                                <div class="row g-2 mb-4">
+                                    <div class="col-md-6">
+                                        <label for="reg-password" class="form-label small text-info">Contraseña</label>
+                                        <input type="password" class="form-control form-control-neon" id="reg-password" placeholder="Mínimo 6 caracteres" required minlength="6">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="reg-confirm-password" class="form-label small text-info">Confirmar Contraseña</label>
+                                        <input type="password" class="form-control form-control-neon" id="reg-confirm-password" placeholder="Repite la contraseña" required minlength="6">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-neon-pink w-100 py-2">
+                                    <i class="bi bi-shield-check me-2"></i> Crear Cuenta de Jugador
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 2: Dashboard del Jugador Autenticado -->
+                <div id="user-dashboard" class="arcade-panel p-4 d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="neon-subtitle text-success"><i class="bi bi-person-badge me-1"></i> Jugador Autenticado</span>
+                        <span id="profile-id" class="badge bg-secondary">#0</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-baseline mb-3">
+                        <h3 class="brand-font text-white mb-0" id="profile-username">Jugador</h3>
+                        <span class="text-muted small" id="profile-email">correo@dominio.com</span>
+                    </div>
+
+                    <!-- Métricas Históricas del Jugador -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <div class="stat-value" id="stat-high-score">0</div>
+                                <div class="stat-label">Puntaje Máx</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <div class="stat-value" id="stat-high-wave" style="color: var(--neon-pink);">0</div>
+                                <div class="stat-label">Oleada Máx</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <div class="stat-value" id="stat-total-kills" style="color: var(--neon-yellow);">0</div>
+                                <div class="stat-label">Bajas Totales</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-box">
+                                <div class="stat-value fs-5" id="stat-total-games">0</div>
+                                <div class="stat-label">Partidas Jugadas</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-box">
+                                <div class="stat-value fs-5" id="stat-total-playtime">0m 0s</div>
+                                <div class="stat-label">Tiempo en Combate</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Simulador de Partida CRUD -->
+                    <div class="p-3 mb-3 rounded bg-black bg-opacity-40 border border-info border-opacity-25">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="brand-font small text-info"><i class="bi bi-controller me-1"></i> Registro Directo a MySQL</span>
+                            <span class="badge bg-dark border border-secondary text-secondary small">POST /api/scores</span>
+                        </div>
+                        <form id="match-sim-form">
+                            <div class="row g-2 mb-2">
+                                <div class="col-4">
+                                    <label class="form-label small text-muted mb-0">Puntuación</label>
+                                    <input type="number" class="form-control form-control-sm form-control-neon" id="sim-score" value="2100" min="0" required>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted mb-0">Oleada</label>
+                                    <input type="number" class="form-control form-control-sm form-control-neon" id="sim-wave" value="6" min="1" required>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted mb-0">Bajas</label>
+                                    <input type="number" class="form-control form-control-sm form-control-neon" id="sim-kills" value="38" min="0" required>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-0">Tiempo (s)</label>
+                                    <input type="number" class="form-control form-control-sm form-control-neon" id="sim-time" value="165" min="0" required>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-0">Precisión (%)</label>
+                                    <input type="number" step="0.1" class="form-control form-control-sm form-control-neon" id="sim-accuracy" value="86.5" min="0" max="100" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-neon-green w-100 py-1">
+                                <i class="bi bi-cloud-arrow-up me-1"></i> Guardar Partida en MySQL
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <button id="btn-open-history" class="btn btn-sm btn-outline-info w-100 py-2" data-bs-toggle="modal" data-bs-target="#historyModal">
+                                <i class="bi bi-clock-history me-1"></i> Partidas
+                            </button>
+                        </div>
+                        <div class="col-4">
+                            <button id="btn-open-achievements" class="btn btn-sm btn-outline-warning w-100 py-2" data-bs-toggle="modal" data-bs-target="#achievementsModal">
+                                <i class="bi bi-award-fill me-1"></i> Logros
+                            </button>
+                        </div>
+                        <div class="col-4">
+                            <button id="btn-refresh-stats" class="btn btn-sm btn-outline-light w-100 py-2">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Stats
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-info mb-1">Token JWT Activo:</label>
+                        <div class="token-preview" id="profile-token">ey...</div>
+                    </div>
+
+                    <button id="btn-logout" class="btn btn-sm btn-neon-red w-100 py-1">
+                        <i class="bi bi-power me-2"></i> Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: TABLA DE CLASIFICACIÓN GLOBAL (LEADERBOARD TOP 10) -->
+        <section class="row">
+            <div class="col-12">
+                <div class="arcade-panel p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <div>
+                            <span class="neon-subtitle">Clasificación Mundial</span>
+                            <h3 class="brand-font text-white mb-0"><i class="bi bi-trophy-fill text-warning me-2"></i> Top 10 Global Leaderboard</h3>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span id="leaderboard-count" class="badge bg-dark border border-secondary text-info">Cargando...</span>
+                            <button id="btn-refresh-leaderboard" class="btn btn-sm btn-outline-info" title="Actualizar Tabla">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table arcade-table align-middle">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 70px;">Rank</th>
+                                    <th>Piloto</th>
+                                    <th>Puntuación</th>
+                                    <th>Oleada</th>
+                                    <th>Bajas</th>
+                                    <th>Supervivencia</th>
+                                    <th>Precisión</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-body">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm text-info me-2" role="status"></div>
+                                        Cargando clasificación...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Historial de Partidas del Jugador -->
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content arcade-modal">
+                <div class="modal-header arcade-modal-header">
+                    <h5 class="modal-title brand-font text-info" id="historyModalLabel">
+                        <i class="bi bi-clock-history text-warning me-2"></i> Historial de Partidas (MySQL)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-secondary small" id="history-modal-subtitle">Últimas 20 partidas registradas en el servidor</span>
+                        <button id="btn-refresh-history" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Recargar
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table arcade-table align-middle">
+                            <thead>
+                                <tr>
+                                    <th># Partida</th>
+                                    <th>Fecha</th>
+                                    <th>Puntuación</th>
+                                    <th>Oleada</th>
+                                    <th>Bajas</th>
+                                    <th>Supervivencia</th>
+                                    <th>Precisión</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm text-info me-2" role="status"></div>
+                                        Cargando partidas desde la base de datos...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer arcade-modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Medallas y Logros del Jugador -->
+    <div class="modal fade" id="achievementsModal" tabindex="-1" aria-labelledby="achievementsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content arcade-modal">
+                <div class="modal-header arcade-modal-header">
+                    <h5 class="modal-title brand-font text-warning" id="achievementsModalLabel">
+                        <i class="bi bi-award-fill me-2"></i> Logros y Medallas de Combate
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-secondary small" id="achievements-summary-text">0 de 6 Desbloqueados</span>
+                        <button id="btn-refresh-achievements" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+                        </button>
+                    </div>
+                    <div class="row g-3" id="achievements-container">
+                        <div class="col-12 text-center text-muted py-4">
+                            <div class="spinner-border spinner-border-sm text-warning me-2" role="status"></div>
+                            Cargando medallas desde MySQL...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer arcade-modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Guía Oficial de Juego, Lore y Controles -->
+    <div class="modal fade" id="instructionsModal" tabindex="-1" aria-labelledby="instructionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content arcade-modal">
+                <div class="modal-header arcade-modal-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-controller fs-4 text-warning"></i>
+                        <div>
+                            <h5 class="modal-title brand-font text-white mb-0" id="instructionsModalLabel">
+                                GUNRUN 2D &bull; MANUAL DE COMBATE Y GUÍA OFICIAL
+                            </h5>
+                            <small class="text-secondary">Sistemas de Batalla, Arsenal Balístico y Lore Táctico</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Pestañas de Navegación de la Guía -->
+                    <ul class="nav nav-pills nav-fill mb-4 p-1 bg-black bg-opacity-50 rounded border border-secondary border-opacity-25" id="guideTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active brand-font" id="tab-lore" data-bs-toggle="pill" data-bs-target="#pane-lore" type="button" role="tab">
+                                <i class="bi bi-book-half me-1"></i> 1. HISTORIA Y MISIÓN
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link brand-font" id="tab-controls" data-bs-toggle="pill" data-bs-target="#pane-controls" type="button" role="tab">
+                                <i class="bi bi-keyboard me-1"></i> 2. CONTROLES
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link brand-font" id="tab-weapons" data-bs-toggle="pill" data-bs-target="#pane-weapons" type="button" role="tab">
+                                <i class="bi bi-crosshair me-1"></i> 3. ARSENAL TÁCTICO
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link brand-font" id="tab-enemies" data-bs-toggle="pill" data-bs-target="#pane-enemies" type="button" role="tab">
+                                <i class="bi bi-radioactive me-1"></i> 4. AMENAZAS Y JEFES
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link brand-font" id="tab-powerups" data-bs-toggle="pill" data-bs-target="#pane-powerups" type="button" role="tab">
+                                <i class="bi bi-lightning-charge me-1"></i> 5. DROPS Y LOGROS
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="guideTabsContent">
+                        <!-- PANE 1: HISTORIA Y MISIÓN -->
+                        <div class="tab-pane fade show active" id="pane-lore" role="tabpanel">
+                            <div class="row g-4 align-items-center">
+                                <div class="col-lg-7">
+                                    <h4 class="brand-font text-info mb-2"><i class="bi bi-terminal-fill me-2"></i> ¿De qué se trata GunRun 2D?</h4>
+                                    <p class="text-light">
+                                        En el año 2088, el complejo orbital <strong>Sector Neon-9</strong> ha caído bajo el control de una inteligencia artificial militar rebelde conocida como <strong>Protocol Omega</strong>. Las líneas de defensa han sido pulverizadas y los enjambres cibernéticos avanzan sin piedad.
+                                    </p>
+                                    <p class="text-light">
+                                        Tomas el control del último piloto blindado del escuadrón <strong>Neon Vanguard</strong>. Atrapado en la arena central de contención, tu deber es resistir oleada tras oleada de máquinas asesinas, coordinar tu arsenal de plasma y aniquilar a los colosos mecánicos que lideran la invasión.
+                                    </p>
+                                    <div class="p-3 rounded bg-dark border border-info border-opacity-50">
+                                        <h6 class="brand-font text-warning mb-1"><i class="bi bi-flag-fill me-1"></i> Tu Objetivo Principal:</h6>
+                                        <p class="small text-secondary mb-0">
+                                            Sobrevivir tantas oleadas como sea humanamente posible, mantener una precisión de disparo letal, destruir al <strong>Mega Titán Omega</strong> cada 5 oleadas y sincronizar tu puntuación con la base de datos MySQL para consagrarte en la cima del <strong>Leaderboard Global</strong>.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="col-lg-5">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50">
+                                        <h6 class="brand-font text-pink mb-3"><i class="bi bi-cpu-fill me-1"></i> Ficha Técnica del Piloto:</h6>
+                                        <ul class="list-unstyled small text-light mb-0">
+                                            <li class="mb-2"><strong class="text-info">Blindaje Base:</strong> 100 HP (Regenerable con botiquines)</li>
+                                            <li class="mb-2"><strong class="text-info">Sobreescudo:</strong> Absorbe 100% del daño sin reducir salud</li>
+                                            <li class="mb-2"><strong class="text-info">Velocidad de Maniobra:</strong> 250 px/s con inercia reducida</li>
+                                            <li class="mb-2"><strong class="text-info">Sincronización:</strong> Guardado de estadísticas en MySQL</li>
+                                            <li class="mb-0"><strong class="text-info">Audio:</strong> Sintetizador Web Audio API de 8 bits / Neón</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PANE 2: CONTROLES -->
+                        <div class="tab-pane fade" id="pane-controls" role="tabpanel">
+                            <h4 class="brand-font text-info mb-3"><i class="bi bi-joystick me-2"></i> Esquema de Controles en Combate</h4>
+                            <div class="row g-3">
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="key-badge">W</span> <span class="key-badge">A</span> <span class="key-badge">S</span> <span class="key-badge">D</span>
+                                        </div>
+                                        <h6 class="brand-font text-white mb-1">Movimiento Vectorial</h6>
+                                        <p class="small text-secondary mb-0">Desplaza tu nave en 8 direcciones. Mantén pulsadas dos teclas para desplazarte en diagonal con normalización de velocidad.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="key-badge"><i class="bi bi-mouse"></i> Cursor</span>
+                                            <span class="key-badge">Clic Izquierdo</span>
+                                        </div>
+                                        <h6 class="brand-font text-white mb-1">Apuntado 360° y Fuego</h6>
+                                        <p class="small text-secondary mb-0">La mira láser sigue la posición de tu cursor. Mantén presionado el clic para disparar en ráfaga continua según la cadencia de tu arma.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="key-badge">R</span>
+                                        </div>
+                                        <h6 class="brand-font text-white mb-1">Recarga Táctica</h6>
+                                        <p class="small text-secondary mb-0">Rellena el cargador de tu arma activa desde la reserva de munición. La recarga toma entre 0.8s y 1.4s.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="key-badge">1</span> <span class="key-badge">2</span> <span class="key-badge">3</span>
+                                            <span class="key-badge">Rueda Ratón</span>
+                                        </div>
+                                        <h6 class="brand-font text-white mb-1">Cambio de Arsenal</h6>
+                                        <p class="small text-secondary mb-0">Alterna instantáneamente entre el Blaster Láser (1), la Escopeta Táctica (2) y el Railgun Penetrante (3).</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="key-badge">ESC</span> o <span class="key-badge">P</span>
+                                        </div>
+                                        <h6 class="brand-font text-white mb-1">Pausa Táctica</h6>
+                                        <p class="small text-secondary mb-0">Congela el motor de simulación para tomar un respiro o ajustar tu estrategia en medio del caos.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="key-badge"><i class="bi bi-volume-up-fill"></i></span>
+                                            <span class="key-badge"><i class="bi bi-arrows-fullscreen"></i></span>
+                                        </div>
+                                        <h6 class="brand-font text-white mb-1">Sonido y Pantalla Completa</h6>
+                                        <p class="small text-secondary mb-0">Usa los botones superiores del HUD para silenciar el sintetizador o expandir el lienzo a toda la pantalla.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PANE 3: ARSENAL TÁCTICO -->
+                        <div class="tab-pane fade" id="pane-weapons" role="tabpanel">
+                            <h4 class="brand-font text-info mb-3"><i class="bi bi-shield-fill-exclamation me-2"></i> Especificaciones del Arsenal</h4>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="p-3 rounded bg-black border border-info h-100">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="badge bg-info text-black brand-font">[1] BLASTER</span>
+                                            <span class="text-info small">Alta Cadencia</span>
+                                        </div>
+                                        <h5 class="brand-font text-white mb-2">Blaster de Plasma</h5>
+                                        <p class="small text-secondary mb-3">Tu arma de servicio estándar. Dispara proyectiles de plasma cian a gran velocidad con retroceso casi nulo.</p>
+                                        <ul class="list-unstyled small text-light mb-0 border-top border-secondary border-opacity-25 pt-2">
+                                            <li><strong>Daño por impacto:</strong> 25 HP</li>
+                                            <li><strong>Capacidad:</strong> 30 proyectiles</li>
+                                            <li><strong>Cadencia:</strong> 120 ms por tiro</li>
+                                            <li><strong>Ideal contra:</strong> Enjambres de drones ligeros</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-3 rounded bg-black border border-warning h-100">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="badge bg-warning text-black brand-font">[2] ESCOPETA</span>
+                                            <span class="text-warning small">Dispersión Masiva</span>
+                                        </div>
+                                        <h5 class="brand-font text-white mb-2">Escopeta de Conmoción</h5>
+                                        <p class="small text-secondary mb-3">Dispara una andanada de 6 perdigones de energía en abanico. Letal a corta distancia con retroceso físico.</p>
+                                        <ul class="list-unstyled small text-light mb-0 border-top border-secondary border-opacity-25 pt-2">
+                                            <li><strong>Daño por impacto:</strong> 18 HP × 6 perdigones</li>
+                                            <li><strong>Capacidad:</strong> 8 cartuchos</li>
+                                            <li><strong>Cadencia:</strong> 550 ms por disparo</li>
+                                            <li><strong>Ideal contra:</strong> Tanques blindados y corta distancia</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-3 rounded bg-black border border-pink h-100" style="border-color: var(--neon-pink) !important;">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="badge text-white brand-font" style="background: var(--neon-pink);">[3] RAILGUN</span>
+                                            <span class="small" style="color: var(--neon-pink);">Penetración</span>
+                                        </div>
+                                        <h5 class="brand-font text-white mb-2">Railgun Penetrante</h5>
+                                        <p class="small text-secondary mb-3">Haz electromagnético de alta energía capaz de atravesar múltiples enemigos en línea recta con daño colosal.</p>
+                                        <ul class="list-unstyled small text-light mb-0 border-top border-secondary border-opacity-25 pt-2">
+                                            <li><strong>Daño por impacto:</strong> 110 HP (Perfora 4 enemigos)</li>
+                                            <li><strong>Capacidad:</strong> 5 proyectiles</li>
+                                            <li><strong>Cadencia:</strong> 900 ms por tiro</li>
+                                            <li><strong>Ideal contra:</strong> Mega Titán y líneas de enemigos</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PANE 4: AMENAZAS Y JEFES -->
+                        <div class="tab-pane fade" id="pane-enemies" role="tabpanel">
+                            <h4 class="brand-font text-danger mb-3"><i class="bi bi-radioactive me-2"></i> Bestiario Cibernético de Protocol Omega</h4>
+                            <div class="row g-3">
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-danger border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge bg-danger">DRON</span>
+                                            <h6 class="brand-font text-white mb-0">Dron Asesino Alfa</h6>
+                                        </div>
+                                        <p class="small text-secondary mb-2">Rápido y ágil. Te persigue incansablemente para colisionar y desintegrar tu armadura con descargas.</p>
+                                        <small class="text-danger d-block"><strong>HP:</strong> 40 | <strong>Velocidad:</strong> Alta | <strong>Daño:</strong> 15</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-warning border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge bg-warning text-dark">TANQUE</span>
+                                            <h6 class="brand-font text-white mb-0">Tanque Blindado Golem</h6>
+                                        </div>
+                                        <p class="small text-secondary mb-2">Pesado y protegido por aleación titánica. Absorbe múltiples impactos antes de ser destruido.</p>
+                                        <small class="text-warning d-block"><strong>HP:</strong> 150 | <strong>Velocidad:</strong> Lenta | <strong>Daño:</strong> 30</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-info border-opacity-50 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge bg-info text-dark">TIRADOR</span>
+                                            <h6 class="brand-font text-white mb-0">Centinela Artillero</h6>
+                                        </div>
+                                        <p class="small text-secondary mb-2">Mantiene su distancia de combate y dispara proyectiles de plasma rojos dirigidos hacia tu posición.</p>
+                                        <small class="text-info d-block"><strong>HP:</strong> 60 | <strong>Velocidad:</strong> Media | <strong>Ataque:</strong> Balística a distancia</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-pink border-opacity-50 h-100" style="border-color: var(--neon-pink) !important;">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge text-white" style="background: var(--neon-pink);">KAMIKAZE</span>
+                                            <h6 class="brand-font text-white mb-0">Interceptor Explosivo</h6>
+                                        </div>
+                                        <p class="small text-secondary mb-2">Carga propulsada por sobrecalentamiento. Al aproximarse acelera ferozmente y detona al contacto.</p>
+                                        <small style="color: var(--neon-pink);" class="d-block"><strong>HP:</strong> 25 | <strong>Velocidad:</strong> Muy Rápida | <strong>Daño:</strong> 40</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 col-lg-8">
+                                    <div class="p-3 rounded bg-dark border border-warning h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge bg-warning text-dark fs-6 brand-font">BOSS EPICO</span>
+                                            <h5 class="brand-font text-warning mb-0">Mega Titán Protocol Omega (Cada 5 Oleadas)</h5>
+                                        </div>
+                                        <p class="small text-light mb-2">
+                                            El núcleo supremo de combate. Aparece automáticamente cada 5 oleadas acompañado de alertas en pantalla, sonido de alarma y una barra gigante de salud en la parte superior. Dispara ráfagas en abanico y genera temblores sísmicos.
+                                        </p>
+                                        <div class="d-flex gap-3 small text-warning">
+                                            <span><strong>HP Base:</strong> 800+ (escala por oleada)</span>
+                                            <span><strong>Recompensa:</strong> Puntuación masiva + Logro TITAN_SLAYER</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PANE 5: DROPS Y LOGROS -->
+                        <div class="tab-pane fade" id="pane-powerups" role="tabpanel">
+                            <h4 class="brand-font text-success mb-3"><i class="bi bi-box2-heart me-2"></i> Suministros Tácticos y Conquistas</h4>
+                            <div class="row g-3 mb-4">
+                                <div class="col-6 col-md-4 col-lg-2">
+                                    <div class="p-2 rounded bg-black border border-danger text-center h-100">
+                                        <i class="bi bi-heart-fill fs-3 text-danger d-block mb-1"></i>
+                                        <strong class="text-white small d-block">Botiquín</strong>
+                                        <small class="text-secondary">+35 Puntos de Salud</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-2">
+                                    <div class="p-2 rounded bg-black border border-info text-center h-100">
+                                        <i class="bi bi-lightning-charge-fill fs-3 text-info d-block mb-1"></i>
+                                        <strong class="text-white small d-block">Munición</strong>
+                                        <small class="text-secondary">+60 Balas de reserva</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-2">
+                                    <div class="p-2 rounded bg-black border border-primary text-center h-100">
+                                        <i class="bi bi-shield-shaded fs-3 text-primary d-block mb-1"></i>
+                                        <strong class="text-white small d-block">Escudo</strong>
+                                        <small class="text-secondary">Defensa impenetrable</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-2">
+                                    <div class="p-2 rounded bg-black border border-warning text-center h-100">
+                                        <i class="bi bi-fire fs-3 text-warning d-block mb-1"></i>
+                                        <strong class="text-white small d-block">Frenesí</strong>
+                                        <small class="text-secondary">2x Cadencia de tiro</small>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-4 col-lg-4">
+                                    <div class="p-2 rounded bg-black border border-pink text-center h-100" style="border-color: var(--neon-pink) !important;">
+                                        <i class="bi bi-radioactive fs-3 d-block mb-1" style="color: var(--neon-pink);"></i>
+                                        <strong class="text-white small d-block">Bomba PEM Nuke</strong>
+                                        <small class="text-secondary">Destruye a todos los enemigos de la arena en 1 segundo</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-3 rounded bg-dark border border-secondary border-opacity-50">
+                                <h6 class="brand-font text-warning mb-2"><i class="bi bi-trophy-fill me-1"></i> Medallas y Persistencia en MySQL</h6>
+                                <p class="small text-secondary mb-0">
+                                    Toda partida jugada estando registrado se sincroniza automáticamente con el backend Flask. Desbloquearás medallas como <strong>Primera Sangre</strong>, <strong>Tirador de Élite</strong> (70%+ de precisión), <strong>Veterano</strong> (Oleada 5+) y <strong>Cazador de Titanes</strong>. Puedes consultar tus medallas y partidas anteriores con los botones <strong>Logros</strong> e <strong>Historial</strong> del panel de usuario.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer arcade-modal-footer">
+                    <button type="button" class="btn btn-sm btn-neon-cyan px-4 py-2" data-bs-dismiss="modal">
+                        <i class="bi bi-check-circle me-1"></i> ¡Entendido, Vamos a la Batalla!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Script de Autenticación y Leaderboard -->
+    <script src="js/auth.js"></script>
+    <!-- Script del Motor de Juego Canvas 2D (Fase 3) -->
+    <script src="js/game.js"></script>
+</body>
+</html>
