@@ -875,6 +875,8 @@ class Player {
             document.querySelectorAll('.btn-weapon').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.weapon === weaponType);
             });
+            const touchLabel = document.getElementById('touch-weapon-label');
+            if (touchLabel) touchLabel.textContent = { blaster: '1', shotgun: '2', railgun: '3' }[weaponType];
         }
     }
 
@@ -891,10 +893,22 @@ class Player {
         if (input.keys['KeyA'] || input.keys['ArrowLeft']) dx -= 1;
         if (input.keys['KeyD'] || input.keys['ArrowRight']) dx += 1;
 
+        // Teclado: velocidad completa en cualquier dirección (normalizado)
+        const kbMag = Math.hypot(dx, dy);
+        if (kbMag > 0) {
+            dx /= kbMag;
+            dy /= kbMag;
+        }
+        // Táctil: el joystick analógico manda y la velocidad es proporcional al empuje
+        if (input.analog && (input.analog.x || input.analog.y)) {
+            dx = input.analog.x;
+            dy = input.analog.y;
+        }
+
         const magnitude = Math.hypot(dx, dy);
         if (magnitude > 0) {
-            dx = (dx / magnitude) * this.speed * dt;
-            dy = (dy / magnitude) * this.speed * dt;
+            dx = dx * this.speed * dt;
+            dy = dy * this.speed * dt;
             this.x += dx;
             this.y += dy;
 
@@ -911,6 +925,12 @@ class Player {
         // Límites de Arena
         this.x = Math.max(this.radius + 8, Math.min(arenaWidth - this.radius - 8, this.x));
         this.y = Math.max(this.radius + 8, Math.min(arenaHeight - this.radius - 8, this.y));
+
+        // Apuntado táctil: el punto de mira sigue la dirección del joystick derecho
+        if (input.aim && input.aim.active) {
+            input.mouse.x = this.x + input.aim.x * 260;
+            input.mouse.y = this.y + input.aim.y * 260;
+        }
 
         // Rotación hacia el cursor
         this.angle = Math.atan2(input.mouse.y - this.y, input.mouse.x - this.x);
@@ -1155,8 +1175,13 @@ class GunRunEngine {
         // Controles de entrada
         this.input = {
             keys: {},
-            mouse: { x: this.virtualWidth / 2 + 60, y: this.virtualHeight / 2, isDown: false }
+            mouse: { x: this.virtualWidth / 2 + 60, y: this.virtualHeight / 2, isDown: false },
+            analog: { x: 0, y: 0 },                 // Joystick izquierdo (movimiento)
+            aim: { x: 0, y: 0, active: false }      // Joystick derecho (apuntar/disparar)
         };
+
+        this.lastTouchTs = 0;
+        this.gameOverTs = 0;
 
         // Métricas de FPS
         this.lastTime = performance.now();
@@ -1172,8 +1197,41 @@ class GunRunEngine {
         requestAnimationFrame(this.loop);
     }
 
+    get isTouch() {
+        return document.body.classList.contains('is-touch');
+    }
+
+    cycleWeapon(dir = 1) {
+        const order = ['blaster', 'shotgun', 'railgun'];
+        const idx = order.indexOf(this.player.currentWeapon);
+        this.player.setWeapon(order[(idx + dir + order.length) % order.length]);
+    }
+
+    // Publica el estado del juego en el contenedor (lo usa el CSS táctil) y suelta los controles
+    syncUIState() {
+        const vp = this.canvas.parentElement;
+        if (!vp || vp.dataset.state === this.state) return;
+        vp.dataset.state = this.state;
+
+        this.input.analog.x = 0;
+        this.input.analog.y = 0;
+        if (this.input.aim.active) this.input.mouse.isDown = false;
+        this.input.aim.active = false;
+
+        if (this.state === 'GAME_OVER') this.gameOverTs = performance.now();
+        window.dispatchEvent(new CustomEvent('gunrun:state', { detail: this.state }));
+    }
+
     setupEventListeners() {
         window.addEventListener('resize', () => this.resize());
+        window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 200));
+        document.addEventListener('fullscreenchange', () => this.resize());
+        document.addEventListener('webkitfullscreenchange', () => this.resize());
+
+        // Auto-pausa si el jugador cambia de app/pestaña o bloquea el celular
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.state === 'PLAYING') this.togglePause();
+        });
 
         window.addEventListener('keydown', (e) => {
             const gameKeys = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyR', 'Digit1', 'Digit2', 'Digit3'];
@@ -1184,7 +1242,7 @@ class GunRunEngine {
             this.soundFX.init();
             this.input.keys[e.code] = true;
 
-            if (e.code === 'Escape') {
+            if (e.code === 'Escape' || e.code === 'KeyP') {
                 this.togglePause();
             }
         });
@@ -1207,6 +1265,7 @@ class GunRunEngine {
 
         this.canvas.addEventListener('mousedown', (e) => {
             e.preventDefault();
+            if (performance.now() - this.lastTouchTs < 800) return;
             this.soundFX.init();
             if (e.button === 0) {
                 this.input.mouse.isDown = true;
@@ -1238,12 +1297,49 @@ class GunRunEngine {
 
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         this.canvas.addEventListener('dragstart', (e) => e.preventDefault());
+
+        // Táctil: tocar la pantalla inicia, reinicia o reanuda la partida
+        this.canvas.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'touch') return;
+            this.lastTouchTs = performance.now();
+            document.body.classList.add('is-touch');
+            this.soundFX.init();
+
+            if (this.state === 'READY') {
+                this.start();
+            } else if (this.state === 'GAME_OVER') {
+                if (performance.now() - this.gameOverTs > 900) this.restart();
+            } else if (this.state === 'PAUSED') {
+                this.togglePause();
+            }
+        });
+    }
+
+    isFullscreenActive() {
+        const c = this.canvas.parentElement;
+        return !!(document.fullscreenElement || document.webkitFullscreenElement ||
+                  (c && c.classList.contains('pseudo-fullscreen')));
     }
 
     resize() {
         const container = this.canvas.parentElement;
         if (!container) return;
-        const targetWidth = Math.min(container.clientWidth, 1000);
+
+        const fs = this.isFullscreenActive();
+        const landscape = window.innerWidth > window.innerHeight;
+
+        // Ancho disponible
+        let maxW = fs ? container.clientWidth : Math.min(container.clientWidth, 1000);
+
+        // Alto disponible: en pantalla completa o en celular horizontal, el canvas debe caber sin hacer scroll
+        let maxH = Infinity;
+        if (fs) maxH = container.clientHeight;
+        else if (this.isTouch && landscape) maxH = window.innerHeight * 0.92;
+
+        // En pantalla completa vertical (celular) se deja espacio para los controles táctiles
+        if (fs && this.isTouch && !landscape) maxH = window.innerHeight - 240;
+
+        const targetWidth = Math.max(160, Math.min(maxW, (maxH * 1000) / 600));
         const targetHeight = (targetWidth * 600) / 1000;
 
         this.canvas.width = this.virtualWidth;
@@ -1266,18 +1362,48 @@ class GunRunEngine {
         }
     }
 
+    enterPseudoFullscreen(container) {
+        container.classList.add('pseudo-fullscreen');
+        document.body.classList.add('no-scroll');
+        setTimeout(() => this.resize(), 50);
+    }
+
     toggleFullscreen() {
         const container = this.canvas.parentElement;
-        if (!document.fullscreenElement) {
-            if (container.requestFullscreen) {
-                container.requestFullscreen();
-            } else if (container.webkitRequestFullscreen) {
-                container.webkitRequestFullscreen();
+        const nativeFs = document.fullscreenElement || document.webkitFullscreenElement;
+        const pseudo = container.classList.contains('pseudo-fullscreen');
+
+        // Salir
+        if (nativeFs || pseudo) {
+            if (pseudo) {
+                container.classList.remove('pseudo-fullscreen');
+                document.body.classList.remove('no-scroll');
             }
+            if (nativeFs) {
+                (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+            }
+            try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) { }
+            setTimeout(() => this.resize(), 50);
+            return;
+        }
+
+        // Entrar (en iPhone no existe la API: se usa el modo "pantalla completa" por CSS)
+        const request = container.requestFullscreen || container.webkitRequestFullscreen;
+        if (!request) {
+            this.enterPseudoFullscreen(container);
+            return;
+        }
+
+        const lockLandscape = () => {
+            if (this.isTouch && screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => { });
+            }
+        };
+        const result = request.call(container);
+        if (result && result.then) {
+            result.then(lockLandscape).catch(() => this.enterPseudoFullscreen(container));
         } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
+            lockLandscape();
         }
     }
 
@@ -1428,6 +1554,8 @@ class GunRunEngine {
             const el = document.getElementById('hud-fps');
             if (el) el.textContent = `${this.fps} FPS`;
         }
+
+        this.syncUIState();
 
         // Screen Shake decay
         if (this.screenShake > 0) {
@@ -1902,7 +2030,7 @@ class GunRunEngine {
         }
 
         // 3. Cargador, Munición y Arma Activa (Abajo Izquierda)
-        const ammoX = 24;
+        const ammoX = this.isTouch ? Math.round(w / 2 - 110) : 24;
         const ammoY = h - 38;
         const curWpn = this.player.weapons[this.player.currentWeapon];
 
@@ -1973,9 +2101,9 @@ class GunRunEngine {
 
         // 6. Modales de Pantalla (Ready, Pause, Game Over)
         if (this.state === 'READY') {
-            this.drawOverlayText(ctx, w, h, 'GUNRUN 2D', 'HAZ CLIC O PRESIONA WASD PARA INICIAR', '#00ffcc');
+            this.drawOverlayText(ctx, w, h, 'GUNRUN 2D', this.isTouch ? 'TOCA LA PANTALLA PARA INICIAR' : 'HAZ CLIC O PRESIONA WASD PARA INICIAR', '#00ffcc');
         } else if (this.state === 'PAUSED') {
-            this.drawOverlayText(ctx, w, h, 'PARTIDA EN PAUSA', 'PRESIONA [ESCAPE] PARA CONTINUAR', '#ffe600');
+            this.drawOverlayText(ctx, w, h, 'PARTIDA EN PAUSA', this.isTouch ? 'TOCA LA PANTALLA PARA CONTINUAR' : 'PRESIONA [ESCAPE] PARA CONTINUAR', '#ffe600');
         } else if (this.state === 'GAME_OVER') {
             this.drawGameOverScreen(ctx, w, h);
         }
@@ -2040,7 +2168,7 @@ class GunRunEngine {
         ctx.shadowColor = '#00ffcc';
         ctx.shadowBlur = 12;
         ctx.font = 'bold 15px "Orbitron", monospace';
-        ctx.fillText('HAZ CLIC O PRESIONA REINICIAR PARA VOLVER AL COMBATE', w / 2, h / 2 + 95);
+        ctx.fillText(this.isTouch ? 'TOCA LA PANTALLA PARA VOLVER AL COMBATE' : 'HAZ CLIC O PRESIONA REINICIAR PARA VOLVER AL COMBATE', w / 2, h / 2 + 95);
 
         ctx.restore();
     }
@@ -2112,8 +2240,8 @@ window.addEventListener('DOMContentLoaded', () => {
     // Auto-pausar la simulación al abrir cualquier modal (Guía, Logros, Historial)
     document.querySelectorAll('.modal').forEach(modalEl => {
         modalEl.addEventListener('show.bs.modal', () => {
-            if (window.gunRunGame && window.gunRunGame.gameState === 'RUNNING') {
-                window.gunRunGame.pauseGame();
+            if (window.gunRunGame && window.gunRunGame.state === 'PLAYING') {
+                window.gunRunGame.togglePause();
             }
         });
     });

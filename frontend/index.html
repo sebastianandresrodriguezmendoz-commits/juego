@@ -2,7 +2,11 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0c10">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="monetag" content="88dbf6094f87688e5b5b40a738951f96">
     <title>GunRun 2D - Combate Arcade, Arsenal Táctico y Boss Battles</title>
 
@@ -88,7 +92,7 @@
                         <i class="bi bi-play-fill me-1"></i> Iniciar Combate
                     </button>
                     <button id="btn-game-pause" class="btn btn-sm btn-outline-warning">
-                        <i class="bi bi-pause-fill me-1"></i> Pausa [ESC]
+                        <i class="bi bi-pause-fill me-1"></i> Pausa <span class="only-pc">[ESC]</span>
                     </button>
                     <button id="btn-toggle-sound" class="btn btn-sm btn-outline-warning" title="Silenciar / Activar Efectos de Sonido">
                         <i class="bi bi-volume-up-fill" id="sound-icon"></i>
@@ -105,14 +109,49 @@
                 </div>
             </div>
 
-            <!-- Viewport del Canvas -->
+            <!-- Aviso: jugar en horizontal (solo móvil en vertical) -->
+            <div class="rotate-hint" role="note">
+                <i class="bi bi-phone-landscape fs-4"></i>
+                <span>Para jugar mejor, <strong>gira el celular</strong> y toca <i class="bi bi-arrows-fullscreen"></i> para pantalla completa.</span>
+            </div>
+
+            <!-- Viewport del Canvas + Controles Táctiles -->
             <div class="game-viewport">
                 <canvas id="gameCanvas" width="1000" height="600"></canvas>
+
+                <div id="touch-controls" aria-label="Controles táctiles">
+                    <div class="touch-side touch-left">
+                        <div class="touch-col">
+                            <button type="button" class="touch-btn" id="tbtn-pause" aria-label="Pausa"><i class="bi bi-pause-fill"></i></button>
+                            <button type="button" class="touch-btn" id="tbtn-fs" aria-label="Pantalla completa"><i class="bi bi-arrows-fullscreen"></i></button>
+                        </div>
+                        <div class="touch-zone" id="stick-move">
+                            <div class="stick-base"><div class="stick-knob"></div></div>
+                            <span class="stick-label">MOVER</span>
+                        </div>
+                    </div>
+                    <div class="touch-side touch-right">
+                        <div class="touch-col">
+                            <button type="button" class="touch-btn touch-btn-weapon" id="tbtn-weapon" aria-label="Cambiar arma"><span id="touch-weapon-label">1</span></button>
+                            <button type="button" class="touch-btn" id="tbtn-reload" aria-label="Recargar"><i class="bi bi-arrow-counterclockwise"></i></button>
+                        </div>
+                        <div class="touch-zone" id="stick-aim">
+                            <div class="stick-base"><div class="stick-knob"></div></div>
+                            <span class="stick-label">APUNTAR / DISPARAR</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Barra Inferior de Controles del Motor -->
             <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-3 text-secondary small">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="only-touch d-flex align-items-center gap-3 flex-wrap">
+                    <span><i class="bi bi-arrows-move text-info"></i> Joystick izq. <strong>Mover</strong></span>
+                    <span><i class="bi bi-bullseye" style="color: var(--neon-pink);"></i> Joystick der. <strong>Apuntar y disparar</strong></span>
+                    <span><i class="bi bi-arrow-counterclockwise text-info"></i> <strong>Recargar</strong></span>
+                    <span><i class="bi bi-repeat" style="color: var(--neon-pink);"></i> <strong>Cambiar arma</strong></span>
+                </div>
+                <div class="only-pc d-flex align-items-center gap-2 flex-wrap">
                     <span><span class="key-badge">W</span> <span class="key-badge">A</span> <span class="key-badge">S</span> <span class="key-badge">D</span> Mover</span>
                     <span><span class="key-badge"><i class="bi bi-mouse"></i> Clic</span> Disparar</span>
                     <span><span class="key-badge">R</span> Recargar</span>
@@ -126,6 +165,102 @@
                     <span class="powerup-pill powerup-shield"><i class="bi bi-shield-fill"></i> Escudo</span>
                     <span class="powerup-pill powerup-rapid"><i class="bi bi-fire"></i> Frenesí</span>
                     <span class="powerup-pill powerup-nuke"><i class="bi bi-radioactive"></i> PEM Nuke</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 1B: CÓMO SE JUEGA (PC / MÓVIL) -->
+        <section class="arcade-panel p-3 p-md-4 mb-4" id="how-to-play">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="neon-subtitle">Guía rápida</span>
+                    <h2 class="brand-font fs-4 text-white mb-0"><i class="bi bi-joystick text-info me-2"></i> CÓMO SE JUEGA</h2>
+                </div>
+                <span id="device-badge" class="badge bg-dark border border-info text-info px-3 py-2 brand-font">Detectando dispositivo...</span>
+            </div>
+
+            <ul class="nav nav-pills nav-fill mb-3 p-1 bg-black bg-opacity-50 rounded border border-secondary border-opacity-25" id="howtoTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active brand-font" id="howto-tab-pc" data-bs-toggle="pill" data-bs-target="#howto-pane-pc" type="button" role="tab">
+                        <i class="bi bi-pc-display me-1"></i> EN PC
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link brand-font" id="howto-tab-mobile" data-bs-toggle="pill" data-bs-target="#howto-pane-mobile" type="button" role="tab">
+                        <i class="bi bi-phone me-1"></i> EN MÓVIL / TABLET
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- PC -->
+                <div class="tab-pane fade show active" id="howto-pane-pc" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table arcade-table align-middle mb-2">
+                            <thead>
+                                <tr><th style="width: 34%;">Acción</th><th>Control</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Iniciar / reiniciar</td><td>Clic en el juego o botón <strong>Iniciar Combate</strong></td></tr>
+                                <tr><td>Mover la nave</td><td><span class="key-badge">W</span> <span class="key-badge">A</span> <span class="key-badge">S</span> <span class="key-badge">D</span> o flechas</td></tr>
+                                <tr><td>Apuntar</td><td>Mueve el <strong>mouse</strong> (la nave mira al cursor)</td></tr>
+                                <tr><td>Disparar</td><td>Mantén el <strong>clic izquierdo</strong> (ráfaga continua)</td></tr>
+                                <tr><td>Recargar</td><td><span class="key-badge">R</span></td></tr>
+                                <tr><td>Cambiar de arma</td><td><span class="key-badge">1</span> <span class="key-badge">2</span> <span class="key-badge">3</span> o la <strong>rueda del mouse</strong></td></tr>
+                                <tr><td>Pausa</td><td><span class="key-badge">ESC</span> o <span class="key-badge">P</span></td></tr>
+                                <tr><td>Pantalla completa / sonido</td><td>Botones <i class="bi bi-arrows-fullscreen"></i> y <i class="bi bi-volume-up-fill"></i> sobre el juego</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- MÓVIL -->
+                <div class="tab-pane fade" id="howto-pane-mobile" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table arcade-table align-middle mb-2">
+                            <thead>
+                                <tr><th style="width: 34%;">Acción</th><th>Control</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Iniciar / reiniciar</td><td><strong>Toca la pantalla</strong> del juego o el botón <strong>Iniciar Combate</strong></td></tr>
+                                <tr><td>Mover la nave</td><td><strong>Joystick izquierdo</strong> (cian). Mientras más lo inclinas, más rápido te mueves</td></tr>
+                                <tr><td>Apuntar y disparar</td><td><strong>Joystick derecho</strong> (rosa). Apuntas hacia donde lo arrastras y disparas solo mientras lo mantengas inclinado</td></tr>
+                                <tr><td>Recargar</td><td>Botón <i class="bi bi-arrow-counterclockwise"></i></td></tr>
+                                <tr><td>Cambiar de arma</td><td>Botón rosa con el número del arma (1 Blaster, 2 Escopeta, 3 Railgun) o los botones del arsenal</td></tr>
+                                <tr><td>Pausa</td><td>Botón <i class="bi bi-pause-fill"></i>. Toca la pantalla para continuar. Se pausa solo si cambias de app</td></tr>
+                                <tr><td>Pantalla completa</td><td>Botón <i class="bi bi-arrows-fullscreen"></i> (recomendado con el celular en <strong>horizontal</strong>)</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="small text-secondary mb-0">
+                        <i class="bi bi-lightbulb-fill text-warning me-1"></i>
+                        Puedes usar <strong>los dos pulgares a la vez</strong>: uno para moverte y otro para apuntar y disparar.
+                        En iPhone la pantalla completa funciona en modo propio de la página.
+                    </p>
+                </div>
+            </div>
+
+            <hr class="border-secondary border-opacity-25 my-3">
+
+            <!-- Lo que es igual en PC y móvil -->
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="p-3 rounded bg-black border border-info border-opacity-50 h-100">
+                        <h6 class="brand-font text-info mb-1"><i class="bi bi-flag-fill me-1"></i> Objetivo</h6>
+                        <p class="small text-secondary mb-0">Sobrevive oleadas de enemigos, destruye al <strong>Mega Titán</strong> cada 5 oleadas y consigue la mayor puntuación.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded bg-black border border-success border-opacity-50 h-100">
+                        <h6 class="brand-font text-success mb-1"><i class="bi bi-box2-heart me-1"></i> Drops</h6>
+                        <p class="small text-secondary mb-0">Recoge botiquines, munición, escudo, frenesí y la bomba <strong>PEM Nuke</strong> pasando sobre ellos.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded bg-black border border-warning border-opacity-50 h-100">
+                        <h6 class="brand-font text-warning mb-1"><i class="bi bi-trophy-fill me-1"></i> Puntaje global</h6>
+                        <p class="small text-secondary mb-0">Inicia sesión abajo para guardar tus partidas, logros y aparecer en el <strong>Top 10 mundial</strong>.</p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -542,7 +677,7 @@
 
                         <!-- PANE 2: CONTROLES -->
                         <div class="tab-pane fade" id="pane-controls" role="tabpanel">
-                            <h4 class="brand-font text-info mb-3"><i class="bi bi-joystick me-2"></i> Esquema de Controles en Combate</h4>
+                            <h4 class="brand-font text-info mb-3"><i class="bi bi-pc-display me-2"></i> En PC: teclado y mouse</h4>
                             <div class="row g-3">
                                 <div class="col-md-6 col-lg-4">
                                     <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
@@ -599,6 +734,46 @@
                                         </div>
                                         <h6 class="brand-font text-white mb-1">Sonido y Pantalla Completa</h6>
                                         <p class="small text-secondary mb-0">Usa los botones superiores del HUD para silenciar el sintetizador o expandir el lienzo a toda la pantalla.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h4 class="brand-font text-info mt-4 mb-3"><i class="bi bi-phone me-2"></i> En móvil / tablet: controles táctiles</h4>
+                            <div class="row g-3">
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-info h-100">
+                                        <h6 class="brand-font text-white mb-1"><i class="bi bi-arrows-move text-info me-1"></i> Joystick izquierdo</h6>
+                                        <p class="small text-secondary mb-0">Mueve la nave. Velocidad proporcional a cuánto lo inclines.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border h-100" style="border-color: var(--neon-pink) !important;">
+                                        <h6 class="brand-font text-white mb-1"><i class="bi bi-bullseye me-1" style="color: var(--neon-pink);"></i> Joystick derecho</h6>
+                                        <p class="small text-secondary mb-0">Apunta hacia donde lo arrastras y dispara mientras lo mantengas inclinado.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <h6 class="brand-font text-white mb-1"><i class="bi bi-arrow-counterclockwise text-info me-1"></i> Recargar</h6>
+                                        <p class="small text-secondary mb-0">Botón circular junto al joystick derecho (equivale a la tecla R).</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <h6 class="brand-font text-white mb-1"><i class="bi bi-repeat me-1" style="color: var(--neon-pink);"></i> Cambiar de arma</h6>
+                                        <p class="small text-secondary mb-0">Botón rosa: pasa de Blaster (1) a Escopeta (2) y Railgun (3).</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <h6 class="brand-font text-white mb-1"><i class="bi bi-pause-fill text-warning me-1"></i> Pausa</h6>
+                                        <p class="small text-secondary mb-0">Botón de pausa junto al joystick izquierdo. Toca la pantalla para continuar.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-black border border-secondary border-opacity-50 h-100">
+                                        <h6 class="brand-font text-white mb-1"><i class="bi bi-arrows-fullscreen text-info me-1"></i> Pantalla completa</h6>
+                                        <p class="small text-secondary mb-0">Juega con el celular en horizontal para ver todo el campo de batalla.</p>
                                     </div>
                                 </div>
                             </div>
@@ -786,5 +961,7 @@
     <script src="js/auth.js"></script>
     <!-- Script del Motor de Juego Canvas 2D (Fase 3) -->
     <script src="js/game.js"></script>
+    <!-- Controles táctiles para móvil / tablet -->
+    <script src="js/touch.js"></script>
 </body>
 </html>
